@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>点名器</title>
+  <script src="js/vue.js"></script>
+  <script src="js/datav.js"></script>
+  <script src="js/p.js"></script>
+  <style>
+    html,
+    body,
+    #app {
+      zoom: 100%;
+      /*别这么搞*/
+
+      width: 100%;
+      height: 100%;
+      margin: 0px;
+      padding: 0px;
+      background-color: #363333;
+    }
+
+    input {
+      -webkit-appearance: none;
+      /* remove default */
+      margin: 10px;
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      cursor: pointer;
+      vertical-align: middle;
+      box-shadow: hsla(0, 0%, 100%, .15) 0 1px 1px, inset hsla(0, 0%, 0%, .5) 0 0 0 1px;
+      background-color: hsla(0, 0%, 0%, .2);
+      background-image: -webkit-radial-gradient(hsla(200, 100%, 90%, 1) 0%, hsla(200, 100%, 70%, 1) 15%, hsla(200, 100%, 60%, .3) 28%, hsla(200, 100%, 30%, 0) 70%);
+      background-repeat: no-repeat;
+      -webkit-transition: background-position .15s cubic-bezier(.8, 0, 1, 1),
+        -webkit-transform .25s cubic-bezier(.8, 0, 1, 1);
+    }
+
+    input:checked {
+      -webkit-transition: background-position .2s .15s cubic-bezier(0, 0, .2, 1),
+        -webkit-transform .25s cubic-bezier(0, 0, .2, 1);
+    }
+
+    input:active {
+      -webkit-transform: scale(1.5);
+      -webkit-transition: -webkit-transform .1s cubic-bezier(0, 0, .2, 1);
+    }
+
+    /* The up/down direction logic */
+
+    input,
+    input:active {
+      background-position: 0 24px;
+    }
+
+    input:checked {
+      background-position: 0 0;
+    }
+
+    input:checked~input,
+    input:checked~input:active {
+      background-position: 0 -24px;
+    }
+
+    /* .border-box-content {
+      color: rgb(66,185,131);
+      font-size: 40px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    } */
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <dv-border-box-1 @mousedown.native="down" @mousemove.native="move" @mouseup.native="up">
+      <dv-decoration-7
+        style="position:absolute ;left:calc(50% - 150px);width:300px;top:25px;height:45px;font-size: 30px;color:aquamarine"
+        onclick="window.location.reload()">
+        点名器
+      </dv-decoration-7>
+      <div>
+        <div v-if="VChooseTab">
+          <dv-border-box-9 id="ChooseTab"
+            style="padding:25px;position:absolute ;left:calc(50% - 125px);top:calc(50% - 95px);width:190px;height: 200px;">
+            <dv-decoration-11 style="width:200px;height:60px;">班级选择</dv-decoration-11> <br />
+            <div v-for="(item,i) in classFiles">
+              <input style="margin-left: 40px;" type="radio" name="name" @click="radio(item)">
+              <span style="color:#006699;font-weight: bold;">{{item}}</span> <br />
+            </div>
+
+          </dv-border-box-9>
+        </div>
+        <div v-if="VSelectTab">
+          <dv-border-box-9
+            style="padding:25px;position:absolute ;left:calc(50% - 175px);top:calc(50% - 190px);width:280px;height: 150px;;">
+            <div v-if="VFinding">
+              <dv-decoration-12 style="width:150px;height:150px;" style="display:block" v-if="!successFlag"><span
+                  style="color:aquamarine">Loading...</span></dv-decoration-12>
+              <img style='width:150px;height:150px;object-fit:cover' v-else @click="selectName()" :src="imgs">
+              <span
+                style="padding:25px;position:absolute ; top: 35px; left:155px;font-size: 25px;color:aquamarine">{{selectedName}}</span>
+            </div>
+          </dv-border-box-9>
+        </div>
+      </div>
+    </dv-border-box-1>
+  </div>
+
+  <script>
+    var fs = require('fs');
+    var path = require('path');
+    
+    //
+    const { ipcRenderer } = window.require('electron')
+    
+    let isDown = false;  // 鼠标状态
+    let baseX = 0, baseY = 0; //监听坐标
+    //
+    var vueApp = new Vue({
+      el: '#app',
+      data: {
+        idx: 1,
+        VChooseTab: true,
+        VSelectTab: false,
+        VFinding: false,
+        sec: 0,
+        imgs: "",
+        selectedName: "zunmx",
+        classFiles: []
+      },
+      created: function () {
+        let self = this;
+        this.VChooseTab = false;
+        fs.readdir('student', function (err, files) {
+          if (err) {
+            alert("不存在student目录")
+          } else {
+            for (let i = 0; i < files.length; i++) {
+              let fileName = files[i]
+              if (fileName.indexOf('txt') === -1) {
+                continue;
+              } else {
+                fileName = fileName.replace(".txt", "");
+              }
+              self.classFiles.push(fileName)
+            }
+            document.getElementById('ChooseTab').style.cssText = "padding:25px;position:absolute ;left:calc(50% - 125px);top:calc(50% - 95px);width:190px;height: " + (parseInt(80) + (files.length * 45)) + "px;"
+          }
+        }
+        );
+
+        this.VChooseTab = true;
+
+      },
+      methods: {
+        down: function (e) {
+          isDown = true
+          baseX = e.x
+          baseY = e.y
+        },
+        move: function (e) {
+          if (isDown) {
+            const x = e.screenX - baseX
+            const y = e.screenY - baseY
+
+            ipcRenderer.send('move-main', {
+              posX: x,
+              posY: y
+            })
+          }
+        },
+        up: function (e) {
+          isDown = false
+        },
+        radio: function (idx) {
+          let self = this;
+          setTimeout(function () {
+            self.idx = idx;
+            self.VChooseTab = false;
+            self.VFinding = true;
+            self.VSelectTab = true;
+            self.successFlag = false;
+            self.selectName()
+          }, 500)
+        },
+        selectName: function () {
+          this.sec = 0;
+          this.successFlag = false;
+          debugger
+          fs.readFile(path.join(process.cwd(),'student', this.idx + ".txt"), 'utf8', (err, data) => {
+            if (err) {
+              alert("读取学生名单文件错误")
+            } else {
+              let txt = data.trim();
+              let nameList = txt.split('\n')
+              this.animationFunc(nameList, 1)
+            }
+          });
+        },
+        animationFunc: function (nameList, timer) {
+
+          let self = this;
+          let handle = setTimeout(function () {
+            timer += 1;
+            // debugger
+            self.selectedName = nameList[(parseInt(Math.random() * 1000)) % nameList.length];
+            console.log(self.selectedName)
+            self.sec++;
+            if (self.sec <= 50) {
+              self.animationFunc(nameList, timer * 1.02)
+            } else {
+              self.successFlag = true;
+              fs.readdir('imgs', function (err, files) {
+                if (err) {
+                  alert("不存在imgs目录")
+                } else {
+                  self.imgs = path.join(process.cwd(), "/imgs/" + files[parseInt(Math.random() * 10000) % files.length])
+                }
+              })
+            }
+          }, timer)
+        }
+      },
+    })
+  </script>
+</body>
+
+</html>
